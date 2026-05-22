@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Integrasi Al-Hikmah</title>
+  
+  <!-- Tailwind CSS Play CDN & Font -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons (Modern Icon Library) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js for beautiful diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+
+  <script>
+    // Configuration Tailwind Custom Colors
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            accent: {
+              violet: '#8b5cf6',
+              indigo: '#6366f1',
+              pink: '#ec4899'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col custom-scrollbar overflow-x-hidden">
+
+  <!-- ================= CONFIGURATION & INITIALIZATION ================= -->
+  <script>
+    // KONSISTENSI CONFIGURATION SAKLAR
+    // UBAH IS_PREVIEW KE false JIKA AKAN DI-DEPLOY DENGAN DATABASE SUPABASE ASLI
+    const IS_PREVIEW = true; 
+    const SUPABASE_URL = "URL_SUPABASE_ANDA_DI_SINI";
+    const SUPABASE_ANON_KEY = "KEY_ANON_SUPABASE_ANDA_DI_SINI";
+
+    // Global App State
+    let appState = {
+      user: null, // logged-in user object { id, username, nama_lengkap, role, kelas_jabatan }
+      activeView: 'landing', // 'landing', 'dashboard', 'absensi', 'modul', 'nilai', 'ujian', 'mading', 'galeri', 'ppdb', 'bell'
+      supabaseClient: null,
+      dummyDb: {} // local mock database state for Preview Mode
+    };
+
+    // Initialize Dummy Database for Preview Mode
+    if (IS_PREVIEW) {
+      appState.dummyDb = {
+        users: [
+          { id: "u-admin", username: "admin", password: "edudigital", nama_lengkap: "Bpk. Hermawan, S.Kom", role: "admin", kelas_jabatan: "Operator & IT" },
+          { id: "u-kepala", username: "kepala", password: "edudigital", nama_lengkap: "Dr. H. Akhmad Fauzi, M.Pd", role: "kepala_madrasah", kelas_jabatan: "Kepala Madrasah" },
+          { id: "u-guru", username: "guru", password: "edudigital", nama_lengkap: "Ibu Siti Rahma, S.Pd", role: "guru", kelas_jabatan: "Matematika" },
+          { id: "u-siswa", username: "siswa", password: "edudigital", nama_lengkap: "Muhammad Faiz", role: "siswa", kelas_jabatan: "Kelas XII-A" }
+        ],
+        absensi: [
+          { id: "a1", tanggal: "2026-05-20", user_id: "u-siswa", status: "Hadir", keterangan: "Tepat waktu" },
+          { id: "a2", tanggal: "2026-05-21", user_id: "u-siswa", status: "Hadir", keterangan: "Tepat waktu" },
+          { id: "a3", tanggal: "2026-05-22", user_id: "u-siswa", status: "Izin", keterangan: "Acara keluarga" }
+        ],
+        modul: [
+          { id: "m1", judul_modul: "Limit Fungsi Aljabar", mapel: "Matematika", kelas: "XII", file_path: "#", pengunggah: "Ibu Siti Rahma, S.Pd", created_at: "2026-05-18" },
+          { id: "m2", judul_modul: "Fisika Quantum Dasar", mapel: "Fisika", kelas: "XII", file_path: "#", pengunggah: "Bpk. Joko, M.Si", created_at: "2026-05-19" }
+        ],
+        nilai: [
+          { id: "n1", siswa_id: "u-siswa", mapel: "Matematika", jenis_nilai: "UTS", skor: 85, tanggal_input: "2026-05-10" },
+          { id: "n2", siswa_id: "u-siswa", mapel: "Matematika", jenis_nilai: "Tugas 1", skor: 90, tanggal_input: "2026-05-15" },
+          { id: "n3", siswa_id: "u-siswa", mapel: "Fisika", jenis_nilai: "UAS", skor: 78, tanggal_input: "2026-05-16" }
+        ],
+        blog_mading: [
+          { id: "b1", kategori: "blog_guru", judul: "Pentingnya Literasi Digital di Era Gen-Z", konten: "Literasi digital bukan lagi pilihan, melainkan sebuah kebutuhan dasar bagi siswa dalam menyaring informasi yang beredar di dunia maya.", image_path: "https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=800&q=80", penulis: "Ibu Siti Rahma, S.Pd", created_at: "2026-05-20" },
+          { id: "b2", kategori: "blog_siswa", judul: "Yuk Mengenal Ekstrakurikuler Robotika Al-Hikmah", konten: "Bagi teman-teman yang menyukai pemrograman dan perakitan hardware, yuk bergabung di ekskul robotika yang diadakan setiap hari Sabtu pagi!", image_path: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=800&q=80", penulis: "Muhammad Faiz", created_at: "2026-05-21" },
+          { id: "b3", kategori: "prestasi", judul: "Juara 1 Olimpiade Fisika Tingkat Provinsi", konten: "Selamat kepada tim sains Al-Hikmah yang berhasil membawa pulang piala emas tingkat provinsi tahun 2026.", image_path: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=800&q=80", penulis: "Admin", created_at: "2026-05-22" }
+        ],
+        ppdb: [
+          { id: "p1", nomor_daftar: "PPDB-2026-001", nama_lengkap: "Rian Hidayat", asal_sekolah: "SMPN 1 Surabaya", no_whatsapp: "08123456789", status: "Diterima", created_at: "2026-05-01" },
+          { id: "p2", nomor_daftar: "PPDB-2026-002", nama_lengkap: "Siti Amelia", asal_sekolah: "MTs Negeri 2", no_whatsapp: "08987654321", status: "Menunggu Seleksi", created_at: "2026-05-15" }
+        ],
+        bell_schedule: [
+          { id: "be1", nama_bell: "Bel Masuk Kelas", jam: "07:00", hari_aktif: "Senin,Selasa,Rabu,Kamis,Jumat" },
+          { id: "be2", nama_bell: "Bel Istirahat", jam: "10:00", hari_aktif: "Senin,Selasa,Rabu,Kamis,Jumat" },
+          { id: "be3", nama_bell: "Bel Pulang Sekolah", jam: "13:30", hari_aktif: "Senin,Selasa,Rabu,Kamis,Jumat" }
+        ]
+      };
+    }
+  </script>
+
+  <!-- ================= HEADER / TOP NAVIGATION ================= -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 transition-all duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Logo & Nama Sekolah -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('landing')">
+        <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
+          <i data-lucide="graduation-cap" class="text-white w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight flex items-center gap-1.5">
+            AL-HIKMAH <span class="bg-brand-100 text-brand-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Smart Portal</span>
+          </h1>
+          <p class="text-[10px] text-slate-500 font-medium">Islamic & Millennial High School</p>
+        </div>
+      </div>
+
+      <!-- Public Navigation / Quick Actions -->
+      <div class="flex items-center space-x-4">
+        <!-- Live Clock Indicator -->
+        <div class="hidden md:flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200/50">
+          <div class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></div>
+          <span id="header-time" class="font-mono text-sm font-semibold text-slate-700">12:00:00</span>
+        </div>
+
+        <div id="unauth-nav" class="flex items-center space-x-2">
+          <button onclick="openPPDBPublic()" class="px-4 py-2 text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-xl transition-all duration-200 flex items-center gap-2">
+            <i data-lucide="file-plus" class="w-4 h-4"></i> Daftar PPDB
+          </button>
+          <button onclick="openLoginModal()" class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-md transition-all duration-200 flex items-center gap-2">
+            <i data-lucide="log-in" class="w-4 h-4"></i> Masuk
+          </button>
+        </div>
+
+        <div id="auth-nav" class="hidden flex items-center space-x-3">
+          <div class="text-right hidden sm:block">
+            <p id="user-display-name" class="text-sm font-bold text-slate-950">Nama Pengguna</p>
+            <p id="user-display-role" class="text-[10px] uppercase font-bold text-emerald-600">Siswa</p>
+          </div>
+          <button onclick="navigateTo('dashboard')" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+          </button>
+          <button onclick="handleLogout()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors" title="Keluar">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="flex-grow flex flex-col">
+
+    <!-- LANDING PAGE (Sektor Publik) -->
+    <section id="view-landing" class="block">
+      <!-- Hero Banner -->
+      <div class="relative overflow-hidden bg-gradient-to-br from-brand-900 via-brand-700 to-emerald-900 py-20 px-4 text-white">
+        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+        <div class="max-w-5xl mx-auto text-center relative z-10 space-y-6">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-xs font-semibold uppercase tracking-wider text-brand-100 transition duration-300">
+            ✨ Penerimaan Peserta Didik Baru (PPDB) T.A 2026/2027 Telah Dibuka!
+          </span>
+          <h1 class="text-4xl md:text-6xl font-black tracking-tight leading-tight">
+            Membangun Generasi <br><span class="text-brand-300">Unggul, Berakhlak & Digital</span>
+          </h1>
+          <p class="text-slate-200 text-base md:text-lg max-w-2xl mx-auto font-light leading-relaxed">
+            Menyelaraskan kurikulum islami tradisional dengan penguasaan teknologi mutakhir demi melahirkan generasi pembaharu di era digital.
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-4 pt-4">
+            <button onclick="openPPDBPublic()" class="px-6 py-3 bg-white text-brand-900 hover:bg-brand-100 font-bold rounded-xl transition shadow-lg flex items-center gap-2">
+              Daftar Sekarang <i data-lucide="arrow-right" class="w-5 h-5"></i>
+            </button>
+            <a href="#mading-section" class="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 font-bold rounded-xl transition flex items-center gap-2">
+              Eksplorasi Mading <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Statistics -->
+      <div class="max-w-7xl mx-auto px-4 -mt-8 relative z-20">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 text-center">
+            <p class="text-3xl font-extrabold text-brand-600">450+</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Siswa Aktif</p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 text-center">
+            <p class="text-3xl font-extrabold text-accent-indigo">30+</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Guru & Staff</p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 text-center">
+            <p class="text-3xl font-extrabold text-accent-violet">12+</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Ekstrakurikuler</p>
+          </div>
+          <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 text-center">
+            <p class="text-3xl font-extrabold text-accent-pink">100%</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Terakreditasi A</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Public Feed -->
+      <div class="max-w-7xl mx-auto px-4 py-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Blog & Mading (Left Column - 2/3 width) -->
+        <div id="mading-section" class="lg:col-span-2 space-y-8">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="newspaper" class="text-brand-500"></i> Mading & Kabar Al-Hikmah
+              </h2>
+              <p class="text-xs text-slate-500 mt-1">Tulisan inspiratif dari guru, siswa, dan pengumuman prestasi sekolah</p>
+            </div>
+          </div>
+          
+          <div id="public-mading-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Dynamic Cards generated by Javascript -->
+          </div>
+        </div>
+
+        <!-- Sidebar Kegiatan & Quick PPDB Info (Right Column) -->
+        <div class="space-y-8">
+          <div class="bg-gradient-to-br from-indigo-50 to-slate-100 p-6 rounded-3xl border border-indigo-100 shadow-md">
+            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2 mb-4">
+              <i data-lucide="info" class="text-indigo-500"></i> Informasi PPDB 2026
+            </h3>
+            <ol class="space-y-4 text-xs font-medium text-slate-700">
+              <li class="flex gap-3">
+                <span class="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">1</span>
+                <div>Isi Formulir Online secara lengkap melalui tombol PPDB.</div>
+              </li>
+              <li class="flex gap-3">
+                <span class="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">2</span>
+                <div>Gunakan nomor Whatsapp aktif untuk pemberitahuan seleksi.</div>
+              </li>
+              <li class="flex gap-3">
+                <span class="w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-[10px] shrink-0">3</span>
+                <div>Verifikasi berkas fisik & wawancara di sekolah sesuai jadwal.</div>
+              </li>
+            </ol>
+            <button onclick="openPPDBPublic()" class="w-full mt-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow transition duration-200">
+              Formulir Pendaftaran PPDB
+            </button>
+          </div>
+
+          <!-- Galeri Sekolah -->
+          <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="image" class="text-brand-500"></i> Galeri Kegiatan
+            </h3>
+            <div id="public-gallery-grid" class="grid grid-cols-2 gap-2">
+              <!-- Dynamically populated pictures -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERNAL APP INTERFACE (Dashboard & Modules) -->
+    <section id="view-internal" class="hidden flex-grow flex">
+      <div class="w-full flex">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-slate-900 text-slate-300 hidden md:flex flex-col border-r border-slate-800 transition-all duration-300">
+          <div class="p-6">
+            <div class="flex items-center gap-3 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white shrink-0 font-bold">
+                AH
+              </div>
+              <div class="overflow-hidden">
+                <p id="sb-user-name" class="text-xs font-bold text-white truncate">Administrator</p>
+                <span id="sb-user-role" class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">Operator</span>
+              </div>
+            </div>
+          </div>
+
+          <nav class="flex-grow px-4 space-y-1">
+            <button onclick="changeInternalTab('dashboard')" class="tab-btn active w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard Utama
+            </button>
+            <button onclick="changeInternalTab('absensi')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="user-check" class="w-4 h-4"></i> Presensi Mandiri & Rekap
+            </button>
+            <button onclick="changeInternalTab('modul')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="book-open" class="w-4 h-4"></i> Modul Pelajaran
+            </button>
+            <button onclick="changeInternalTab('nilai')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="award" class="w-4 h-4"></i> Input & Hasil Nilai
+            </button>
+            <button onclick="changeInternalTab('ujian')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="file-text" class="w-4 h-4"></i> Ujian Online
+            </button>
+            <button onclick="changeInternalTab('mading')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="edit-3" class="w-4 h-4"></i> Mading & Blog Siswa
+            </button>
+            <button onclick="changeInternalTab('ppdb')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="users" class="w-4 h-4"></i> Manajemen PPDB
+            </button>
+            <button onclick="changeInternalTab('bell')" class="tab-btn w-full py-2.5 px-4 rounded-xl text-left flex items-center gap-3 text-xs font-bold hover:bg-slate-800 hover:text-white transition duration-200">
+              <i data-lucide="bell" class="w-4 h-4"></i> Bell Schedule & Audio
+            </button>
+          </nav>
+
+          <div class="p-6 border-t border-slate-800">
+            <button onclick="handleLogout()" class="w-full py-2 bg-rose-950/40 hover:bg-rose-900 border border-rose-800/60 text-rose-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition duration-200">
+              <i data-lucide="log-out" class="w-4 h-4"></i> Keluar
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <div class="flex-grow p-4 sm:p-8 bg-slate-50 overflow-y-auto max-h-[calc(100vh-4rem)]">
+          
+          <!-- TAB: Dashboard -->
+          <div id="tab-dashboard" class="tab-content space-y-6">
+            <!-- Header Tab -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Selamat Datang di Dashboard</h2>
+                <p class="text-xs text-slate-500 mt-1">Sistem Pemantauan Digital Terpadu Madrasah Al-Hikmah</p>
+              </div>
+              <div class="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-2xl border border-emerald-100 text-xs font-bold shadow-sm">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500 animate-pulse"></i> Mode Keamanan Aktif
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-brand-50 text-brand-600 rounded-2xl"><i data-lucide="users" class="w-6 h-6"></i></div>
+                <div>
+                  <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Siswa</p>
+                  <p class="text-xl font-extrabold text-slate-950">452 Siswa</p>
+                </div>
+              </div>
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-2xl"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+                <div>
+                  <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Kehadiran Hari Ini</p>
+                  <p class="text-xl font-extrabold text-slate-950">96.4%</p>
+                </div>
+              </div>
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-violet-50 text-violet-600 rounded-2xl"><i data-lucide="book-open" class="w-6 h-6"></i></div>
+                <div>
+                  <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Modul Terunggah</p>
+                  <p class="text-xl font-extrabold text-slate-950">84 Materi</p>
+                </div>
+              </div>
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-2xl"><i data-lucide="clipboard-list" class="w-6 h-6"></i></div>
+                <div>
+                  <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Pendaftar PPDB</p>
+                  <p id="dashboard-total-ppdb" class="text-xl font-extrabold text-slate-950">0</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main Panel: Graphs -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <i data-lucide="trending-up" class="text-emerald-500"></i> Statistik Kehadiran Mingguan (%)
+                </h3>
+                <div class="h-64">
+                  <canvas id="chart-absensi"></canvas>
+                </div>
+              </div>
+              
+              <!-- Sistem Bell Cepat di Dashboard -->
+              <div class="bg-gradient-to-br from-slate-900 to-slate-850 text-white p-6 rounded-3xl shadow-lg flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-4">
+                    <span class="text-[10px] font-bold uppercase bg-white/10 px-2.5 py-1 rounded-full text-slate-300 tracking-wider">Autometic Bell System</span>
+                    <i data-lucide="bell" class="text-yellow-400 w-5 h-5 animate-bounce"></i>
+                  </div>
+                  <h3 class="text-2xl font-black">Digital Bell</h3>
+                  <p class="text-xs text-slate-300 mt-1">Sistem Bell digital terjadwal Al-Hikmah terintegrasi Audio.</p>
+                </div>
+                
+                <div class="my-6 bg-white/5 border border-white/10 p-4 rounded-2xl text-center">
+                  <p class="text-xs text-slate-400">Jadwal Bell Terdekat</p>
+                  <p class="text-lg font-bold text-emerald-400 mt-1">07:00 WIB</p>
+                  <p class="text-[10px] text-slate-400 mt-1">Hari Aktif: Sen, Sel, Rab, Kam, Jum</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button onclick="manualBellTrigger()" class="py-2.5 bg-brand-600 hover:bg-brand-500 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition">
+                    <i data-lucide="play" class="w-4 h-4"></i> Mainkan Manual
+                  </button>
+                  <button onclick="changeInternalTab('bell')" class="py-2.5 bg-white/15 hover:bg-white/25 border border-white/10 font-bold text-xs rounded-xl flex items-center justify-center transition">
+                    Atur Jadwal
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Absensi -->
+          <div id="tab-absensi" class="tab-content hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Sistem Presensi Sekolah</h2>
+                <p class="text-xs text-slate-500 mt-1">Pencatatan kehadiran siswa dan guru secara digital transparan.</p>
+              </div>
+              <button onclick="openFormPresensi()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition">
+                <i data-lucide="plus" class="w-4 h-4"></i> Buat Presensi Mandiri
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <!-- Riwayat Kehadiran (Table) -->
+              <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="text-sm font-bold text-slate-900">Log Kehadiran Terbaru</h3>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs">
+                    <thead>
+                      <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                        <th class="py-3">Tanggal</th>
+                        <th class="py-3">Nama</th>
+                        <th class="py-3">Status</th>
+                        <th class="py-3">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody id="attendance-log-body">
+                      <!-- Dynamically Loaded -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Statistik Absen Pribadi / Guru -->
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="text-sm font-bold text-slate-900">Informasi Akumulasi Absensi</h3>
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                    <span class="text-xs font-semibold text-slate-600">Total Hari Masuk</span>
+                    <span class="text-xs font-bold text-slate-900">180 Hari</span>
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
+                    <span class="text-xs font-semibold text-emerald-700">Hadir</span>
+                    <span id="absen-stat-hadir" class="text-xs font-bold text-emerald-900">0 Hari</span>
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
+                    <span class="text-xs font-semibold text-amber-700">Izin & Sakit</span>
+                    <span id="absen-stat-izin" class="text-xs font-bold text-amber-900">0 Hari</span>
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-rose-50 rounded-xl">
+                    <span class="text-xs font-semibold text-rose-700">Alpa (Tanpa Keterangan)</span>
+                    <span id="absen-stat-alpa" class="text-xs font-bold text-rose-900">0 Hari</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Modul Pelajaran -->
+          <div id="tab-modul" class="tab-content hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Modul Pembelajaran & Materi</h2>
+                <p class="text-xs text-slate-500 mt-1">Unduh modul, LKPD, atau tonton video pembelajaran langsung di portal sekolah.</p>
+              </div>
+              <button id="btn-upload-modul" onclick="openUploadModulModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition">
+                <i data-lucide="upload" class="w-4 h-4"></i> Upload Modul Pelajaran
+              </button>
+            </div>
+
+            <!-- List Modul -->
+            <div id="modul-list-container" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <!-- Dynamically populated cards -->
+            </div>
+          </div>
+
+          <!-- TAB: Nilai -->
+          <div id="tab-nilai" class="tab-content hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Evaluasi Nilai Akademik</h2>
+                <p class="text-xs text-slate-500 mt-1">Pantau perolehan nilai tugas, kuis, UTS, dan UAS secara transparan.</p>
+              </div>
+              <button id="btn-input-nilai" onclick="openInputNilaiModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition">
+                <i data-lucide="plus" class="w-4 h-4"></i> Input Nilai Baru
+              </button>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                      <th class="py-3">Mata Pelajaran</th>
+                      <th class="py-3">Siswa</th>
+                      <th class="py-3">Jenis Nilai</th>
+                      <th class="py-3">Skor</th>
+                      <th class="py-3">Tanggal Input</th>
+                    </tr>
+                  </thead>
+                  <tbody id="nilai-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Ujian Online -->
+          <div id="tab-ujian" class="tab-content hidden space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+              <h2 class="text-2xl font-black text-slate-900">Simulasi Ujian & Kuis Online</h2>
+              <p class="text-xs text-slate-500 mt-1">Uji kemampuan akademis Anda dengan sistem ujian digital berbasis waktu.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <!-- List Ujian Tersedia -->
+              <div class="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="text-sm font-bold text-slate-900">Daftar Ujian Aktif</h3>
+                <div class="divide-y divide-slate-100">
+                  <div class="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <p class="text-xs font-extrabold text-indigo-600 uppercase tracking-wider">Kuis Harian Matematika</p>
+                      <h4 class="text-sm font-bold text-slate-950 mt-1">Ujian Limit Fungsi Aljabar</h4>
+                      <div class="flex items-center gap-4 text-[10px] text-slate-500 mt-2 font-medium">
+                        <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> 15 Menit</span>
+                        <span class="flex items-center gap-1"><i data-lucide="list" class="w-3.5 h-3.5"></i> 3 Soal Pilihan Ganda</span>
+                      </div>
+                    </div>
+                    <button onclick="startOnlineExamSim()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow">
+                      Kerjakan Ujian
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hasil Ujian Terakhir -->
+              <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="text-sm font-bold text-slate-900">Hasil Ujian Sebelumnya</h3>
+                <div class="space-y-3">
+                  <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200/50 flex justify-between items-center">
+                    <div>
+                      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tryout UN IPA</p>
+                      <p class="text-xs font-bold text-slate-900 mt-0.5">Fisika Quantum</p>
+                    </div>
+                    <span class="text-sm font-black text-brand-600">90 / 100</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Mading & Blog Siswa -->
+          <div id="tab-mading" class="tab-content hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Mading & Blog Digital</h2>
+                <p class="text-xs text-slate-500 mt-1">Buat, sunting, dan bagikan karya tulis menarik Anda.</p>
+              </div>
+              <button onclick="openCreateBlogModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition">
+                <i data-lucide="plus" class="w-4 h-4"></i> Buat Postingan Baru
+              </button>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                      <th class="py-3">Judul</th>
+                      <th class="py-3">Kategori</th>
+                      <th class="py-3">Penulis</th>
+                      <th class="py-3">Tanggal Dibuat</th>
+                      <th class="py-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mading-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Manajemen PPDB -->
+          <div id="tab-ppdb" class="tab-content hidden space-y-6">
+            <div class="border-b border-slate-200 pb-4">
+              <h2 class="text-2xl font-black text-slate-900">Manajemen PPDB Al-Hikmah</h2>
+              <p class="text-xs text-slate-500 mt-1">Verifikasi, ubah status, dan kelola dokumen peserta didik baru.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                      <th class="py-3">No. Daftar</th>
+                      <th class="py-3">Nama Lengkap</th>
+                      <th class="py-3">Asal Sekolah</th>
+                      <th class="py-3">No. WhatsApp</th>
+                      <th class="py-3">Status</th>
+                      <th class="py-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ppdb-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Bell Schedule & Audio -->
+          <div id="tab-bell" class="tab-content hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900">Pengaturan Bell Sekolah Otomatis</h2>
+                <p class="text-xs text-slate-500 mt-1">Kelola jam operasional bell dan jadwal aktifitas harian siswa.</p>
+              </div>
+              <button onclick="openAddBellModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-md transition">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Jadwal Bell
+              </button>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-100 text-slate-400 font-bold uppercase">
+                      <th class="py-3">Nama Bell</th>
+                      <th class="py-3">Waktu</th>
+                      <th class="py-3">Hari Aktif</th>
+                      <th class="py-3">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bell-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= AUTHENTICATION MODAL ================= -->
+  <div id="modal-login" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl border border-slate-200 space-y-6 relative">
+      <button onclick="closeLoginModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-full transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 bg-brand-100 rounded-2xl flex items-center justify-center text-brand-600 mx-auto">
+          <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-950">Autentikasi Pengguna</h3>
+        <p class="text-xs text-slate-500">Gunakan akun yang telah didaftarkan oleh Operator Sekolah.</p>
+      </div>
+
+      <form id="login-form" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Username</label>
+          <input id="login-username" type="text" required placeholder="Contoh: guru / siswa" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none transition">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Password</label>
+          <input id="login-password" type="password" required placeholder="••••••••" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none transition">
+        </div>
+        <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition duration-200 flex items-center justify-center gap-2">
+          Masuk ke Portal <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+
+      <div class="bg-slate-50 border border-slate-150 p-4 rounded-2xl">
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide text-center">🔐 Akun Simulasi Preview</p>
+        <div class="mt-2 text-[10px] text-slate-600 space-y-1">
+          <div class="flex justify-between"><span>Admin:</span> <span class="font-mono bg-slate-200 px-1 rounded">admin / edudigital</span></div>
+          <div class="flex justify-between"><span>Guru:</span> <span class="font-mono bg-slate-200 px-1 rounded">guru / edudigital</span></div>
+          <div class="flex justify-between"><span>Siswa:</span> <span class="font-mono bg-slate-200 px-1 rounded">siswa / edudigital</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FORM INPUT PPDB MODAL ================= -->
+  <div id="modal-ppdb" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 space-y-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <button onclick="closePPDBPublic()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-full transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="space-y-2 text-center">
+        <h3 class="text-xl font-bold text-slate-950">Formulir Pendaftaran PPDB</h3>
+        <p class="text-xs text-slate-500">Silakan isi data calon siswa secara lengkap dan benar.</p>
+      </div>
+
+      <form onsubmit="handlePPDBSubmit(event)" class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nama Lengkap</label>
+          <input id="ppdb-nama" type="text" required placeholder="Nama lengkap pendaftar" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none transition">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Asal Sekolah</label>
+          <input id="ppdb-asal" type="text" required placeholder="Nama SMP / MTs asal" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none transition">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nomor WhatsApp Aktif</label>
+          <input id="ppdb-wa" type="tel" required placeholder="Format: 08xxxxxxxxxx" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none transition">
+        </div>
+        <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition duration-200">
+          Kirim Formulir Pendaftaran
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL TEMPLATE FOR CRUD ACTIONS ================= -->
+  <!-- Generic Action Modal to implement Upload Modul, Input Nilai, Create Post, Presensi, etc. -->
+  <div id="modal-action-form" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 space-y-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <button onclick="closeActionFormModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-full transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <h3 id="action-modal-title" class="text-lg font-bold text-slate-950">Formulir Tambah Data</h3>
+      <div id="action-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ================= SIMULATOR UJIAN ONLINE MODAL ================= -->
+  <div id="modal-exam-sim" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white p-8 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 space-y-6 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <h3 class="font-extrabold text-sm text-slate-900">Ujian: Limit Fungsi Aljabar</h3>
+        <span id="exam-timer" class="text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full font-mono font-bold">15:00</span>
+      </div>
+
+      <div id="exam-question-area" class="space-y-4">
+        <!-- Interactive questions will be written here -->
+      </div>
+
+      <div class="flex justify-between pt-4 border-t border-slate-200">
+        <button id="exam-prev-btn" onclick="examNavigate(-1)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition">Kembali</button>
+        <button id="exam-next-btn" onclick="examNavigate(1)" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition">Selanjutnya</button>
+        <button id="exam-submit-btn" onclick="submitExam()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition hidden">Selesai & Kumpulkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= WEB APPLICATION LOGIC (JAVASCRIPT) ================= -->
+  <script>
+    // Live Clock Update
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('header-time').innerText = now.toTimeString().split(' ')[0] + " WIB";
+    }, 1000);
+
+    // Initial load function
+    window.addEventListener('load', () => {
+      // Initialize icons
+      lucide.createIcons();
+      // Render landing page data
+      renderLandingPageData();
+      // Active view
+      navigateTo('landing');
+    });
+
+    // SPA Route Navigation
+    function navigateTo(viewName) {
+      appState.activeView = viewName;
+      
+      const views = {
+        landing: document.getElementById('view-landing'),
+        internal: document.getElementById('view-internal')
+      };
+
+      if (viewName === 'landing') {
+        views.landing.classList.remove('hidden');
+        views.internal.classList.add('hidden');
+        renderLandingPageData();
+      } else {
+        if (!appState.user) {
+          openLoginModal();
+          return;
+        }
+        views.landing.classList.add('hidden');
+        views.internal.classList.remove('hidden');
+        changeInternalTab(viewName === 'dashboard' ? 'dashboard' : viewName);
+      }
+    }
+
+    // Tab switcher inside the Authenticated/Internal panel
+    function changeInternalTab(tabId) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      // Show requested tab
+      const tabElement = document.getElementById(`tab-${tabId}`);
+      if (tabElement) tabElement.classList.remove('hidden');
+
+      // Update active navigation state
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-slate-800', 'text-white', 'font-black');
+        btn.classList.add('text-slate-300');
+      });
+
+      // Highlight active sidebar menu button
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+      if (activeBtn) {
+        activeBtn.classList.remove('text-slate-300');
+        activeBtn.classList.add('bg-slate-800', 'text-white', 'font-black');
+      }
+
+      // Load specific tab database logic
+      loadTabData(tabId);
+    }
+
+    // Render Data to Landing (Mading & Galeri)
+    function renderLandingPageData() {
+      const madingContainer = document.getElementById('public-mading-container');
+      const galleryContainer = document.getElementById('public-gallery-grid');
+      
+      madingContainer.innerHTML = '';
+      galleryContainer.innerHTML = '';
+
+      let blogs = [];
+      if (IS_PREVIEW) {
+        blogs = appState.dummyDb.blog_mading;
+      }
+
+      blogs.forEach(item => {
+        // Render Mading Feed Cards
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-3xl border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-md transition duration-200";
+        card.innerHTML = `
+          <img src="${item.image_path}" class="w-full h-48 object-cover" alt="Image Post">
+          <div class="p-6 space-y-3">
+            <span class="inline-block text-[9px] font-bold uppercase tracking-wider px-2.5 py-1 bg-brand-50 text-brand-700 rounded-full">${item.kategori.replace('_', ' ')}</span>
+            <h3 class="font-bold text-sm text-slate-900 leading-snug">${item.judul}</h3>
+            <p class="text-[11px] text-slate-500 line-clamp-2">${item.konten}</p>
+            <div class="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-2 border-t border-slate-100">
+              <span>Oleh: <span class="font-semibold text-slate-600">${item.penulis}</span></span>
+              <span>${item.created_at}</span>
+            </div>
+          </div>
+        `;
+        madingContainer.appendChild(card);
+
+        // Populate Gallery from images
+        const imgCard = document.createElement('div');
+        imgCard.className = "group relative rounded-xl overflow-hidden aspect-square border border-slate-100 shadow-sm cursor-pointer";
+        imgCard.innerHTML = `
+          <img src="${item.image_path}" class="w-full h-full object-cover transition duration-300 group-hover:scale-110" alt="Galeri">
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent flex items-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <p class="text-[9px] text-white font-semibold truncate w-full">${item.judul}</p>
+          </div>
+        `;
+        galleryContainer.appendChild(imgCard);
+      });
+    }
+
+    // ================= MODAL HANDLERS =================
+    function openLoginModal() {
+      document.getElementById('modal-login').classList.remove('hidden');
+      document.getElementById('modal-login').classList.add('flex');
+    }
+    function closeLoginModal() {
+      document.getElementById('modal-login').classList.add('hidden');
+      document.getElementById('modal-login').classList.remove('flex');
+    }
+    function openPPDBPublic() {
+      document.getElementById('modal-ppdb').classList.remove('hidden');
+      document.getElementById('modal-ppdb').classList.add('flex');
+    }
+    function closePPDBPublic() {
+      document.getElementById('modal-ppdb').classList.add('hidden');
+      document.getElementById('modal-ppdb').classList.remove('flex');
+    }
+    function closeActionFormModal() {
+      document.getElementById('modal-action-form').classList.add('hidden');
+      document.getElementById('modal-action-form').classList.remove('flex');
+    }
+
+    // Login Handler logic
+    function handleLoginSubmit(event) {
+      event.preventDefault();
+      const userVal = document.getElementById('login-username').value.trim();
+      const passVal = document.getElementById('login-password').value.trim();
+
+      if (IS_PREVIEW) {
+        const found = appState.dummyDb.users.find(u => u.username === userVal && u.password === passVal);
+        if (found) {
+          appState.user = found;
+          initiateAuthenticatedSession();
+          closeLoginModal();
+        } else {
+          alert('Username atau Password salah! Perhatikan tabel kredensial simulasi.');
+        }
+      } else {
+        // IMPLEMENTASI AUTHENTICATION SUPABASE ASLI
+        alert('Supabase login flow akan diaktifkan setelah setup production.');
+      }
+    }
+
+    function initiateAuthenticatedSession() {
+      document.getElementById('unauth-nav').classList.add('hidden');
+      document.getElementById('auth-nav').classList.remove('hidden');
+      
+      document.getElementById('user-display-name').innerText = appState.user.nama_lengkap;
+      document.getElementById('user-display-role').innerText = appState.user.role.replace('_', ' ');
+      
+      document.getElementById('sb-user-name').innerText = appState.user.nama_lengkap;
+      document.getElementById('sb-user-role').innerText = appState.user.role.replace('_', ' ');
+
+      // Show/Hide menus based on Role-based access control (RBAC)
+      setupRoleBasedMenuAccess();
+
+      navigateTo('dashboard');
+    }
+
+    function setupRoleBasedMenuAccess() {
+      const role = appState.user.role;
+      // Admin: Full Access
+      // Kepala Madrasah: Read only
+      // Guru: Input, absensi, modul, nilai
+      // Siswa: view-only except presensi mandiri & ujian online
+      
+      // Control button creation elements based on role
+      const btnUpload = document.getElementById('btn-upload-modul');
+      const btnNilai = document.getElementById('btn-input-nilai');
+
+      if (role === 'siswa' || role === 'kepala_madrasah') {
+        if (btnUpload) btnUpload.classList.add('hidden');
+        if (btnNilai) btnNilai.classList.add('hidden');
+      } else {
+        if (btnUpload) btnUpload.classList.remove('hidden');
+        if (btnNilai) btnNilai.classList.remove('hidden');
+      }
+    }
+
+    function handleLogout() {
+      appState.user = null;
+      document.getElementById('unauth-nav').classList.remove('hidden');
+      document.getElementById('auth-nav').classList.add('hidden');
+      navigateTo('landing');
+    }
+
+    // PPDB Registration Submission
+    function handlePPDBSubmit(event) {
+      event.preventDefault();
+      const nama = document.getElementById('ppdb-nama').value.trim();
+      const asal = document.getElementById('ppdb-asal').value.trim();
+      const wa = document.getElementById('ppdb-wa').value.trim();
+
+      const newRegistration = {
+        id: "p" + (appState.dummyDb.ppdb.length + 1),
+        nomor_daftar: "PPDB-2026-00" + (appState.dummyDb.ppdb.length + 1),
+        nama_lengkap: nama,
+        asal_sekolah: asal,
+        no_whatsapp: wa,
+        status: "Menunggu Seleksi",
+        created_at: new Date().toISOString().split('T')[0]
+      };
+
+      if (IS_PREVIEW) {
+        appState.dummyDb.ppdb.push(newRegistration);
+        alert(`Pendaftaran Berhasil! Nomor Pendaftaran Anda: ${newRegistration.nomor_daftar}`);
+        closePPDBPublic();
+        renderLandingPageData();
+      }
+    }
+
+    // ================= DYNAMIC DATA TABLES LOADERS =================
+    let attendanceChart = null; // Global reference for Chart JS instance
+
+    function loadTabData(tabId) {
+      if (tabId === 'dashboard') {
+        document.getElementById('dashboard-total-ppdb').innerText = appState.dummyDb.ppdb.length + " Siswa";
+        
+        // Render Chart.js
+        const ctx = document.getElementById('chart-absensi').getContext('2d');
+        if (attendanceChart) attendanceChart.destroy();
+        
+        attendanceChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
+            datasets: [{
+              label: 'Kehadiran Kelas XII',
+              data: [98, 97, 95, 96, 96.4],
+              borderColor: '#16a34a',
+              backgroundColor: 'rgba(22, 163, 74, 0.1)',
+              borderWidth: 3,
+              tension: 0.4,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { min: 90, max: 100 } }
+          }
+        });
+      }
+
+      if (tabId === 'absensi') {
+        const body = document.getElementById('attendance-log-body');
+        body.innerHTML = '';
+        const list = appState.dummyDb.absensi;
+        list.forEach(item => {
+          const u = appState.dummyDb.users.find(x => x.id === item.user_id) || { nama_lengkap: 'Siswa' };
+          const row = document.createElement('tr');
+          row.className = "border-b border-slate-100 hover:bg-slate-50";
+          row.innerHTML = `
+            <td class="py-3 font-medium text-slate-700">${item.tanggal}</td>
+            <td class="py-3 font-semibold text-slate-900">${u.nama_lengkap}</td>
+            <td class="py-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${item.status === 'Hadir' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${item.status}</span></td>
+            <td class="py-3 text-slate-500">${item.keterangan}</td>
+          `;
+          body.appendChild(row);
+        });
+
+        // Absen Stats Update
+        document.getElementById('absen-stat-hadir').innerText = list.filter(a => a.status === 'Hadir').length + " Hari";
+        document.getElementById('absen-stat-izin').innerText = list.filter(a => a.status === 'Izin' || a.status === 'Sakit').length + " Hari";
+        document.getElementById('absen-stat-alpa').innerText = list.filter(a => a.status === 'Alpa').length + " Hari";
+      }
+
+      if (tabId === 'modul') {
+        const container = document.getElementById('modul-list-container');
+        container.innerHTML = '';
+        appState.dummyDb.modul.forEach(m => {
+          const card = document.createElement('div');
+          card.className = "bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between h-48";
+          card.innerHTML = `
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md">${m.mapel}</span>
+                <span class="text-[9px] font-bold uppercase text-slate-400">Kelas ${m.kelas}</span>
+              </div>
+              <h4 class="font-bold text-sm text-slate-950 leading-snug">${m.judul_modul}</h4>
+              <p class="text-[10px] text-slate-400">Pengunggah: ${m.pengunggah}</p>
+            </div>
+            <a href="${m.file_path}" class="w-full py-2 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl text-center text-xs font-bold transition flex items-center justify-center gap-1.5 mt-4">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Unduh Modul (PDF)
+            </a>
+          `;
+          container.appendChild(card);
+        });
+        lucide.createIcons();
+      }
+
+      if (tabId === 'nilai') {
+        const body = document.getElementById('nilai-table-body');
+        body.innerHTML = '';
+        appState.dummyDb.nilai.forEach(n => {
+          const s = appState.dummyDb.users.find(u => u.id === n.siswa_id) || { nama_lengkap: 'Fajar' };
+          const row = document.createElement('tr');
+          row.className = "border-b border-slate-100";
+          row.innerHTML = `
+            <td class="py-3 font-semibold text-slate-900">${n.mapel}</td>
+            <td class="py-3 font-medium text-slate-600">${s.nama_lengkap}</td>
+            <td class="py-3 font-medium text-slate-500">${n.jenis_nilai}</td>
+            <td class="py-3 font-extrabold ${n.skor >= 80 ? 'text-emerald-600' : 'text-slate-900'}">${n.skor}</td>
+            <td class="py-3 text-slate-400">${n.tanggal_input}</td>
+          `;
+          body.appendChild(row);
+        });
+      }
+
+      if (tabId === 'mading') {
+        const body = document.getElementById('mading-table-body');
+        body.innerHTML = '';
+        appState.dummyDb.blog_mading.forEach(b => {
+          const row = document.createElement('tr');
+          row.className = "border-b border-slate-100 text-xs";
+          row.innerHTML = `
+            <td class="py-3 font-semibold text-slate-950">${b.judul}</td>
+            <td class="py-3"><span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-bold uppercase text-[9px]">${b.kategori}</span></td>
+            <td class="py-3 font-medium text-slate-500">${b.penulis}</td>
+            <td class="py-3 text-slate-400">${b.created_at}</td>
+            <td class="py-3 flex gap-2">
+              <button onclick="deleteBlogSim('${b.id}')" class="text-rose-600 hover:underline font-bold">Hapus</button>
+            </td>
+          `;
+          body.appendChild(row);
+        });
+      }
+
+      if (tabId === 'ppdb') {
+        const body = document.getElementById('ppdb-table-body');
+        body.innerHTML = '';
+        appState.dummyDb.ppdb.forEach(p => {
+          const row = document.createElement('tr');
+          row.className = "border-b border-slate-100 text-xs";
+          row.innerHTML = `
+            <td class="py-3 font-bold text-indigo-600">${p.nomor_daftar}</td>
+            <td class="py-3 font-semibold text-slate-950">${p.nama_lengkap}</td>
+            <td class="py-3 text-slate-600">${p.asal_sekolah}</td>
+            <td class="py-3 font-mono">${p.no_whatsapp}</td>
+            <td class="py-3">
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${p.status === 'Diterima' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
+                ${p.status}
+              </span>
+            </td>
+            <td class="py-3 flex gap-2">
+              <button onclick="updatePPDBStatus('${p.id}', 'Diterima')" class="text-emerald-600 hover:underline font-bold">Terima</button>
+              <button onclick="updatePPDBStatus('${p.id}', 'Ditolak')" class="text-rose-600 hover:underline font-bold">Tolak</button>
+            </td>
+          `;
+          body.appendChild(row);
+        });
+      }
+
+      if (tabId === 'bell') {
+        const body = document.getElementById('bell-table-body');
+        body.innerHTML = '';
+        appState.dummyDb.bell_schedule.forEach(be => {
+          const row = document.createElement('tr');
+          row.className = "border-b border-slate-100 text-xs";
+          row.innerHTML = `
+            <td class="py-3 font-bold text-slate-950">${be.nama_bell}</td>
+            <td class="py-3 font-mono font-extrabold text-brand-600">${be.jam} WIB</td>
+            <td class="py-3 text-slate-500">${be.hari_aktif}</td>
+            <td class="py-3">
+              <button onclick="triggerSpecificBell('${be.id}')" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded-md font-semibold text-slate-700">Test Chime</button>
+            </td>
+          `;
+          body.appendChild(row);
+        });
+      }
+    }
+
+    // Interactive Admin Action Mocking
+    function openFormPresensi() {
+      const modal = document.getElementById('modal-action-form');
+      const title = document.getElementById('action-modal-title');
+      const body = document.getElementById('action-modal-body');
+
+      title.innerText = "Presensi Mandiri Siswa";
+      body.innerHTML = `
+        <form onsubmit="savePresensiSim(event)" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Tanggal</label>
+            <input id="p-date" type="date" value="${new Date().toISOString().split('T')[0]}" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Status Kehadiran</label>
+            <select id="p-status" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+              <option value="Hadir">Hadir (Tepat Waktu)</option>
+              <option value="Izin">Izin (Ada Keperluan)</option>
+              <option value="Sakit">Sakit (Keterangan Dokter)</option>
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Catatan / Keterangan</label>
+            <input id="p-notes" type="text" placeholder="Keterangan tambahan..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition">Simpan Presensi</button>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function savePresensiSim(event) {
+      event.preventDefault();
+      const date = document.getElementById('p-date').value;
+      const status = document.getElementById('p-status').value;
+      const notes = document.getElementById('p-notes').value;
+
+      appState.dummyDb.absensi.unshift({
+        id: "a" + (appState.dummyDb.absensi.length + 1),
+        tanggal: date,
+        user_id: appState.user.id,
+        status: status,
+        keterangan: notes || "Diinput Mandiri"
+      });
+
+      alert("Presensi Anda berhasil dicatat!");
+      closeActionFormModal();
+      loadTabData('absensi');
+    }
+
+    function openUploadModulModal() {
+      const modal = document.getElementById('modal-action-form');
+      const title = document.getElementById('action-modal-title');
+      const body = document.getElementById('action-modal-body');
+
+      title.innerText = "Upload Modul Baru";
+      body.innerHTML = `
+        <form onsubmit="saveModulSim(event)" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Judul Modul</label>
+            <input id="m-judul" type="text" placeholder="Contoh: Limit Fungsi" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Mata Pelajaran</label>
+              <input id="m-mapel" type="text" placeholder="Matematika" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Kelas</label>
+              <input id="m-kelas" type="text" placeholder="XII" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Simulasi Berkas PDF</label>
+            <div class="border-2 border-dashed border-slate-250 p-6 rounded-2xl text-center bg-slate-50">
+              <i data-lucide="file-text" class="w-8 h-8 mx-auto text-slate-400"></i>
+              <p class="text-[10px] font-bold text-slate-500 mt-2">Seret atau unggah file di sini</p>
+            </div>
+          </div>
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition">Simpan & Publikasikan</button>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function saveModulSim(event) {
+      event.preventDefault();
+      appState.dummyDb.modul.unshift({
+        id: "m" + (appState.dummyDb.modul.length + 1),
+        judul_modul: document.getElementById('m-judul').value,
+        mapel: document.getElementById('m-mapel').value,
+        kelas: document.getElementById('m-kelas').value,
+        file_path: "#",
+        pengunggah: appState.user.nama_lengkap,
+        created_at: new Date().toISOString().split('T')[0]
+      });
+
+      alert("Modul pelajaran berhasil diunggah!");
+      closeActionFormModal();
+      loadTabData('modul');
+    }
+
+    function openInputNilaiModal() {
+      const modal = document.getElementById('modal-action-form');
+      const title = document.getElementById('action-modal-title');
+      const body = document.getElementById('action-modal-body');
+
+      title.innerText = "Input Penilaian Siswa";
+      body.innerHTML = `
+        <form onsubmit="saveNilaiSim(event)" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Mata Pelajaran</label>
+            <input id="n-mapel" type="text" placeholder="Matematika" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Jenis Ujian</label>
+            <input id="n-jenis" type="text" placeholder="UTS / Kuis / Tugas 1" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Skor Nilai (0-100)</label>
+            <input id="n-skor" type="number" min="0" max="100" placeholder="85" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition">Simpan Nilai</button>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function saveNilaiSim(event) {
+      event.preventDefault();
+      appState.dummyDb.nilai.unshift({
+        id: "n" + (appState.dummyDb.nilai.length + 1),
+        siswa_id: "u-siswa", // Default to Faiz in dummy database
+        mapel: document.getElementById('n-mapel').value,
+        jenis_nilai: document.getElementById('n-jenis').value,
+        skor: parseInt(document.getElementById('n-skor').value),
+        tanggal_input: new Date().toISOString().split('T')[0]
+      });
+
+      alert("Evaluasi nilai berhasil ditambahkan!");
+      closeActionFormModal();
+      loadTabData('nilai');
+    }
+
+    function openCreateBlogModal() {
+      const modal = document.getElementById('modal-action-form');
+      const title = document.getElementById('action-modal-title');
+      const body = document.getElementById('action-modal-body');
+
+      title.innerText = "Buat Artikel Mading";
+      body.innerHTML = `
+        <form onsubmit="saveBlogSim(event)" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Kategori</label>
+            <select id="b-kategori" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+              <option value="blog_guru">Blog Guru</option>
+              <option value="blog_siswa">Blog Siswa</option>
+              <option value="prestasi">Pengumuman Prestasi</option>
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Judul Artikel</label>
+            <input id="b-judul" type="text" placeholder="Masukkan judul..." required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Isi Tulisan</label>
+            <textarea id="b-konten" rows="4" placeholder="Tuliskan gagasan, tips atau artikel menarik di sini..." required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none resize-none"></textarea>
+          </div>
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition">Posting Sekarang</button>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function saveBlogSim(event) {
+      event.preventDefault();
+      appState.dummyDb.blog_mading.unshift({
+        id: "b" + (appState.dummyDb.blog_mading.length + 1),
+        kategori: document.getElementById('b-kategori').value,
+        judul: document.getElementById('b-judul').value,
+        konten: document.getElementById('b-konten').value,
+        image_path: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=800&q=80",
+        penulis: appState.user.nama_lengkap,
+        created_at: new Date().toISOString().split('T')[0]
+      });
+
+      alert("Kabar mading berhasil diposting!");
+      closeActionFormModal();
+      loadTabData('mading');
+    }
+
+    function deleteBlogSim(id) {
+      if (confirm("Apakah Anda yakin ingin menghapus artikel mading ini?")) {
+        appState.dummyDb.blog_mading = appState.dummyDb.blog_mading.filter(b => b.id !== id);
+        loadTabData('mading');
+      }
+    }
+
+    function updatePPDBStatus(id, newStatus) {
+      const p = appState.dummyDb.ppdb.find(x => x.id === id);
+      if (p) {
+        p.status = newStatus;
+        alert(`Status pendaftar ${p.nama_lengkap} diubah menjadi: ${newStatus}`);
+        loadTabData('ppdb');
+      }
+    }
+
+    // Menampilkan modal tambah jadwal bel baru
+    function openAddBellModal() {
+      const modal = document.getElementById('modal-action-form');
+      const title = document.getElementById('action-modal-title');
+      const body = document.getElementById('action-modal-body');
+
+      title.innerText = "Tambah Jadwal Bel Baru";
+      body.innerHTML = `
+        <form onsubmit="saveBellSim(event)" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nama Bel</label>
+            <input id="be-nama" type="text" placeholder="Contoh: Bel Istirahat Pertama" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Waktu (Format Jam:Menit)</label>
+            <input id="be-jam" type="time" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Hari Aktif (pisahkan dengan koma)</label>
+            <input id="be-hari" type="text" value="Senin,Selasa,Rabu,Kamis,Jumat" placeholder="Contoh: Senin,Selasa" required class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs outline-none">
+          </div>
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow-lg transition duration-200">
+            Simpan Jadwal Bel
+          </button>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    // Menyimpan jadwal bel baru ke database dummy
+    function saveBellSim(event) {
+      event.preventDefault();
+      const nama = document.getElementById('be-nama').value.trim();
+      const jam = document.getElementById('be-jam').value;
+      const hari = document.getElementById('be-hari').value.trim();
+
+      appState.dummyDb.bell_schedule.push({
+        id: "be" + (appState.dummyDb.bell_schedule.length + 1),
+        nama_bell: nama,
+        jam: jam,
+        hari_aktif: hari
+      });
+
+      alert("Jadwal bel baru berhasil ditambahkan!");
+      closeActionFormModal();
+      loadTabData('bell');
+    }
+
+    // ================= WEB AUDIO API SCHOOL BELL SIMULATOR =================
+    function triggerSpecificBell(id) {
+      const b = appState.dummyDb.bell_schedule.find(x => x.id === id);
+      if (b) {
+        alert(`🔔 Membunyikan digital chime untuk: ${b.nama_bell}`);
+        playSchoolBellSound();
+      }
+    }
+
+    function manualBellTrigger() {
+      alert("🔔 Membunyikan simulasi Bel Sekolah Al-Hikmah!");
+      playSchoolBellSound();
+    }
+
+    function playSchoolBellSound() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      const playTone = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.3, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      // Play 3 harmonic notes as classic digital bell chime
+      playTone(523.25, ctx.currentTime, 0.4);       // C5
+      playTone(659.25, ctx.currentTime + 0.35, 0.4); // E5
+      playTone(783.99, ctx.currentTime + 0.7, 0.8);  // G5
+    }
+
+    // ================= INTERACTIVE EXAM SIMULATOR =================
+    let examState = {
+      currentQuestion: 0,
+      answers: {},
+      timerInterval: null,
+      secondsLeft: 900 // 15 Minutes
+    };
+
+    const examQuestions = [
+      {
+        id: 1,
+        text: "Tentukan nilai dari $\\lim_{x \\to 3} \\frac{x^2 - 9}{x - 3}$.",
+        options: ["A. 3", "B. 6", "C. 9", "D. 0"]
+      },
+      {
+        id: 2,
+        text: "Evaluasi nilai limit trigonometri berikut: $\\lim_{x \\to 0} \\frac{\\sin(2x)}{x}$.",
+        options: ["A. 1", "B. 2", "C. $\\frac{1}{2}$", "D. 0"]
+      },
+      {
+        id: 3,
+        text: "Hitung $\\lim_{x \\to \\infty} \\frac{3x^2 - 4x + 1}{x^2 + 5}$.",
+        options: ["A. $\\infty$", "B. 0", "C. 3", "D. 4"]
+      }
+    ];
+
+    function startOnlineExamSim() {
+      examState.currentQuestion = 0;
+      examState.answers = {};
+      examState.secondsLeft = 900;
+      
+      document.getElementById('modal-exam-sim').classList.remove('hidden');
+      document.getElementById('modal-exam-sim').classList.add('flex');
+
+      renderExamQuestion();
+
+      if (examState.timerInterval) clearInterval(examState.timerInterval);
+      examState.timerInterval = setInterval(() => {
+        examState.secondsLeft--;
+        const min = Math.floor(examState.secondsLeft / 60);
+        const sec = examState.secondsLeft % 60;
+        document.getElementById('exam-timer').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        
+        if (examState.secondsLeft <= 0) {
+          clearInterval(examState.timerInterval);
+          submitExam();
+        }
+      }, 1000);
+    }
+
+    function renderExamQuestion() {
+      const q = examQuestions[examState.currentQuestion];
+      const area = document.getElementById('exam-question-area');
+      area.innerHTML = `
+        <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Pertanyaan ${examState.currentQuestion + 1} dari ${examQuestions.length}</p>
+        <p class="text-xs font-semibold text-slate-800 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200/50">${q.text}</p>
+        <div class="space-y-2 mt-4">
+          ${q.options.map((opt, idx) => `
+            <label class="flex items-center gap-3 p-3 rounded-2xl border ${examState.answers[q.id] === idx ? 'border-brand-500 bg-brand-50/50 text-brand-900 font-bold' : 'border-slate-200 hover:bg-slate-50'} text-xs cursor-pointer transition">
+              <input type="radio" name="option-${q.id}" class="hidden" onclick="selectExamOption(${q.id}, ${idx})">
+              <span>${opt}</span>
+            </label>
+          `).join('')}
+        </div>
+      `;
+
+      // Update Navigation Buttons visibility
+      document.getElementById('exam-prev-btn').classList.toggle('hidden', examState.currentQuestion === 0);
+      document.getElementById('exam-next-btn').classList.toggle('hidden', examState.currentQuestion === examQuestions.length - 1);
+      document.getElementById('exam-submit-btn').classList.toggle('hidden', examState.currentQuestion !== examQuestions.length - 1);
+    }
+
+    function selectExamOption(qId, index) {
+      examState.answers[qId] = index;
+      renderExamQuestion();
+    }
+
+    function examNavigate(dir) {
+      examState.currentQuestion += dir;
+      renderExamQuestion();
+    }
+
+    function submitExam() {
+      clearInterval(examState.timerInterval);
+      document.getElementById('modal-exam-sim').classList.add('hidden');
+      document.getElementById('modal-exam-sim').classList.remove('flex');
+      
+      // Calculate score mock
+      let correct = 0;
+      if (examState.answers[1] === 1) correct++; // B. 6
+      if (examState.answers[2] === 1) correct++; // B. 2
+      if (examState.answers[3] === 2) correct++; // C. 3
+
+      const scoreValue = Math.round((correct / examQuestions.length) * 100);
+
+      // Save to Nilai
+      appState.dummyDb.nilai.unshift({
+        id: "n" + (appState.dummyDb.nilai.length + 1),
+        siswa_id: appState.user.id,
+        mapel: "Matematika",
+        jenis_nilai: "Kuis Harian",
+        skor: scoreValue,
+        tanggal_input: new Date().toISOString().split('T')[0]
+      });
+
+      alert(`Selamat! Anda telah menyelesaikan ujian.\nSkor Anda: ${scoreValue} / 100`);
+      loadTabData('ujian');
+    }
+  </script>
+</body>
+</html>
